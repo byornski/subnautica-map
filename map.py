@@ -1,7 +1,9 @@
 from math import sqrt, cos, sin, atan2
+import pickle
 
 small_value = 1.0e-6
-dist_tol = 1.0e-1
+dist_tol = 1.0
+debug = True
 
 class MapObject(object):
     """A single entity on the map"""
@@ -21,12 +23,12 @@ class MapObject(object):
         diff_y = self.posY - pos[1]
         return sqrt(diff_x ** 2 + diff_y ** 2)
 
-
     def __repr__(self):
         """Get a string representation of the object"""
-        return "{} : ({},{})".format(self.name, self.posX, self.posY)
+        return "{} : ({:.1f},:{:.1f})".format(self.name, self.posX, self.posY)
 
     def pos(self):
+        """Return position as a tuple"""
         return self.posX, self.posY
 
 
@@ -50,17 +52,41 @@ class Map(object):
     def __init__(self):
         """Initialises the map as empty"""
         self.num_markers = 0
-        self.markers = []
+        self.markers = dict()
 
     def add_reference_point(self, reference_point: MapObject):
         """Adds a reference point to the map"""
-        self.markers.append(reference_point)
+        self.markers[reference_point.name] = reference_point
 
     def add_point(self, ref1: MapObject, ref2: MapObject, ref3: MapObject, r1: float, r2: float, r3: float, name: str):
         """Add a point by triangulation to reference points"""
 
+        # Find the position of the mystery point
+        pos = triangulate(ref1, ref2, ref3, r1, r2, r3)
+
+        # Add it to the master list of points
+        point = MapObject(name, *pos)
+        self.markers[name] = point
+        self.num_markers += 1
+
+        if debug:
+            print("Triangulation result ===> {}".format(point))
+
+        return point
+
+    def save(self, file):
+        with open(file, "wb") as fd:
+            pickle.dump(self, fd)
+
+    @staticmethod
+    def load(file) -> 'Map':
+        with open(file, "rb") as fd:
+            return pickle.load(fd)
+
+
 
 def triangulate(ref1: MapObject, ref2: MapObject, ref3: MapObject, r1: float, r2: float, r3: float):
+    """Works out the position of the new point from 3 reference points"""
     # Get circle positions
     p1 = ref1.pos()
     p2 = ref2.pos()
