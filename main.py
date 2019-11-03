@@ -27,39 +27,10 @@ marker_size = 5.0
 marker_colour = "black"
 
 root = tk.Tk()
+root.title("Subnautica Mapper")
 w = tk.Canvas(root, width=canvas_width, height=canvas_height, bg="white")
 
-# Marked points
-
-ref1_option = tk.StringVar(root)
-ref2_option = tk.StringVar(root)
-ref3_option = tk.StringVar(root)
-
-mark1_point = None
-mark2_point = None
-mark3_point = None
-
-mark1_circle = None
-mark2_circle = None
-mark3_circle = None
-
-d1_circle_tag = "d1_circle_tag"
-d2_circle_tag = "d2_circle_tag"
-d3_circle_tag = "d3_circle_tag"
-
-mark1_colour = "blue"
-mark2_colour = "red"
-mark3_colour = "green"
-
-mark1_dist = tk.StringVar(root)
-mark2_dist = tk.StringVar(root)
-mark3_dist = tk.StringVar(root)
-
-opt1_menu = None
-opt2_menu = None
-opt3_menu = None
-
-newmark_name = tk.StringVar(root)
+new_mark_name = tk.StringVar(root)
 
 
 def save_map():
@@ -72,85 +43,22 @@ def load_map():
     mainMap = Map.load("map.save")
 
     # Refresh canvas
-
     w.delete("all")
+
+    # Empty options lists
+    opt1.rm_options()
+    opt2.rm_options()
+    opt3.rm_options()
+
+    # Now add each point to the canvas and options lists
     for marker in mainMap.markers.values():
         draw_point(marker)
+        opt1.add_option(marker.name)
+        opt2.add_option(marker.name)
+        opt3.add_option(marker.name)
 
 
-def draw_circle(coords, radius, tag):
-    ax, ay, bx, by = coords
-    px = (ax + bx) // 2
-    py = (ay + by) // 2
-    w.create_oval(px - radius, py - radius, px + radius, py + radius, tag=tag)
-
-
-def mark1(opt=None):
-    global mark1_point
-
-    if opt:
-        ref1_option.set(opt)
-
-    w.delete(d1_circle_tag)
-    w.itemconfig(mark1_point, fill=marker_colour)
-    mark1_point = ref1_option.get()
-    w.itemconfig(mark1_point, fill=mark1_colour)
-
-    # Draw a circle if the radius has been given
-    try:
-        d1 = float(mark1_dist.get()) * canvas_scale
-    except ValueError:
-        return False
-
-    draw_circle(w.coords(mark1_point), d1, d1_circle_tag)
-    return True
-
-
-def mark2(opt=None):
-    global mark2_point
-
-    if opt:
-        ref2_option.set(opt)
-
-    w.delete(d2_circle_tag)
-    w.itemconfig(mark2_point, fill=marker_colour)
-    mark2_point = ref2_option.get()
-    w.itemconfig(mark2_point, fill=mark2_colour)
-
-    # Draw a circle if the radius has been given
-    try:
-        d2 = float(mark2_dist.get()) * canvas_scale
-    except ValueError:
-        return False
-
-    draw_circle(w.coords(mark2_point), d2, d2_circle_tag)
-    return True
-
-
-def mark3(opt=None):
-    global mark3_point
-
-    if opt:
-        ref3_option.set(opt)
-
-    w.delete(d3_circle_tag)
-    w.itemconfig(mark3_point, fill=marker_colour)
-    mark3_point = ref3_option.get()
-    w.itemconfig(mark3_point, fill=mark3_colour)
-
-    # Draw a circle if the radius has been given
-    try:
-        d3 = float(mark3_dist.get()) * canvas_scale
-    except ValueError:
-        return False
-
-    draw_circle(w.coords(mark3_point), d3, d3_circle_tag)
-    return True
-
-
-def draw_point(marker, circle_radius=None, circle_marker=None):
-    global opt1_menu, opt2_menu, opt3_menu
-
+def draw_point(marker):
     posX = marker.posX * canvas_scale + canvas_offset_width
     posY = marker.posY * canvas_scale + canvas_offset_height
 
@@ -163,136 +71,181 @@ def draw_point(marker, circle_radius=None, circle_marker=None):
 
     text = w.create_text(posX, posY - 3.0 * marker_size, text=marker.name)
 
-    # Add to options lists
-    add_to_list(opt1_menu, marker.name, ref1_option, mark1)
-    add_to_list(opt2_menu, marker.name, ref2_option, mark2)
-    add_to_list(opt3_menu, marker.name, ref3_option, mark3)
-
-
-def add_to_list(menu, item, ref_opt, mark_cmd):
-    m = menu.children['menu']
-    m.add_command(label=item, command=lambda v=ref_opt, l=item: v.set(l) or mark_cmd())
-
 
 def add_point():
+    global error_label
+
+    error_label['text'] = ""
+
     # get distances from gui
     try:
-        d1 = float(mark1_dist.get())
-    except ValueError:
-        raise Exception("Must specify a distance to point 1")
+        d1 = opt1.get_dist()
+        d2 = opt2.get_dist()
+        d3 = opt3.get_dist()
 
-    try:
-        d2 = float(mark2_dist.get())
-    except ValueError:
-        raise Exception("Must specify a distance to point 2")
-
-    try:
-        d3 = float(mark3_dist.get())
-    except ValueError:
-        raise Exception("Must specify a distance to point 3")
-
-    # get reference points
-    try:
-        ref1 = mainMap.markers[ref1_option.get()]
-    except KeyError:
-        raise Exception("Invalid reference for point 1")
-
-    try:
-        ref2 = mainMap.markers[ref2_option.get()]
-    except KeyError:
-        raise Exception("Invalid reference for point 2")
-
-    try:
-        ref3 = mainMap.markers[ref3_option.get()]
-    except KeyError:
-        raise Exception("Invalid reference for point 3")
+        ref1 = opt1.get_ref()
+        ref2 = opt2.get_ref()
+        ref3 = opt3.get_ref()
+    except ValueError as err:
+        error_label['text'] = err
+        return
 
     # Finally get the new name
-    point_name = newmark_name.get()
+    point_name = new_mark_name.get()
+
+    if point_name == "" or " " in point_name:
+        error_label['text'] = "Must specify a valid name for new point"
+        return
 
     # Now we can actually do the triangulation
-    marker = mainMap.add_point(ref1, ref2, ref3, d1, d2, d3, point_name)
+    try:
+        marker = mainMap.add_point(ref1, ref2, ref3, d1, d2, d3, point_name)
+    except AssertionError as err:
+        error_label['text'] = err
+        return
 
     # Mark this last point on the actual map
     draw_point(marker)
 
+    # Add to options
+    opt1.add_option(marker.name)
+    opt2.add_option(marker.name)
+    opt3.add_option(marker.name)
 
 
-class mapReference(object):
-    def __init__(self, colour, root, row, options, name):
+class MapReference(object):
+    def __init__(self, colour, root, canvas, row, options, name):
 
         # Save the inputs
         self.name = name
         self.root = root
+        self.canvas = canvas
         self.row = row
-        self.options = options
+        self.options = []
         self.colour = colour
 
         # tk items
         self.label = None
         self.opt_menu = None
         self.dist_entry = None
-        self.option_selected = tk.StringVar(root)
+        self.ref_option = tk.StringVar(root)
         self.mark_dist = tk.StringVar(root)
 
         # last marked point
-        self.mark_point = None
-        self.mark_circle = None
-        self.circle_tag = name.replace(" ", "") + "-circle-" + str(row)
-        print(self.circle_tag)
+        self.canvas_point = None
+        self.canvas_circle = None
 
+        # Radius circle
+        self.circle_radius = None
+
+        self.draw()
+
+        self.rm_options()
+        for i in options:
+            self.add_option(i)
 
     def draw(self):
-        self.label = tk.Label(root, text=self.name, bg=self.colour, fg="white")
+        self.label = tk.Label(root, text=self.name, bg=self.colour, fg="white", width=50)
         self.label.grid(row=self.row, column=1)
-        self.opt_menu = tk.OptionMenu(root, ref1_option, [], command=mark1)
-        self.opt_menu.grid(row=self.row, column=2)
-        self.dist_entry = tk.Entry(root, textvariable=mark1_dist, validate="focusout", validatecommand=mark1)
-        self.dist_entry.grid(row=self.row, column=3)
+
+        self.opt_menu = tk.OptionMenu(root, self.ref_option, [], command=self.opt_update())
+        self.opt_menu.config(width=20)
+        self.opt_menu.grid(row=self.row, column=2, sticky="ew")
+
+        self.dist_entry = tk.Entry(root, textvariable=self.mark_dist)
+
+        self.mark_dist.trace("w", self.text_update())
+
+        self.dist_entry.grid(row=self.row, column=3, pady=10)
 
     def opt_update(self):
-        pass
+        def callback(value):
+            self.redraw_point()
+            if self.circle_radius:
+                self.redraw_circle()
+
+        return callback
+
+    def text_update(self):
+        def callback(*kwargs):
+            try:
+                self.circle_radius = self.get_dist()
+                self.redraw_circle()
+                return True
+            except ValueError:
+                return False
+
+        return callback
+
+    def get_dist(self):
+        try:
+            return float(self.mark_dist.get())
+        except ValueError:
+            raise ValueError("Must specify a valid distance!")
+
+    def get_ref(self):
+        try:
+            return mainMap.markers[self.ref_option.get()]
+        except KeyError:
+            raise ValueError("Invalid reference point")
+
+    def redraw_point(self):
+        # Set old point to black
+        if self.canvas_point:
+            self.canvas.itemconfig(self.canvas_point, fill="black")
+
+        # Get reference point
+        self.canvas_point = self.get_ref().name
+
+        # Mark point
+        self.canvas.itemconfig(self.canvas_point, fill=self.colour)
+
+    def rm_options(self):
+        m = self.opt_menu.children['menu']
+        m.delete(0, 'end')
+
+    def add_option(self, item):
+        m = self.opt_menu.children['menu']
+        m.add_command(label=item, command=lambda v=self.ref_option, l=item: v.set(l) or self.opt_update()(item))
+
+    def redraw_circle(self):
+        # Delete old circle
+        if self.canvas_circle:
+            self.canvas.delete(self.canvas_circle)
+
+        # Grab point from canvas
+        ref = self.get_ref().name
+        radius = self.circle_radius
+
+        ax, ay, bx, by = self.canvas.coords(ref)
+        px = (ax + bx) // 2
+        py = (ay + by) // 2
+
+        self.canvas_circle = \
+            self.canvas.create_oval(px - radius * canvas_scale,
+                                    py - radius * canvas_scale,
+                                    px + radius * canvas_scale,
+                                    py + radius * canvas_scale)
 
 
+w.grid(row=0, columnspan=5)
 
+opt1 = MapReference("blue", root, w, 1, mainMap.markers.keys(), "Reference Point 1")
+opt2 = MapReference("red", root, w, 2, mainMap.markers.keys(), "Reference Point 2")
+opt3 = MapReference("green", root, w, 3, mainMap.markers.keys(), "Reference Point 3")
 
+tk.Label(root, text="New point name:").grid(row=4, column=1)
+tk.Entry(root, textvariable=new_mark_name).grid(row=4, column=2)
 
+tk.Button(root, text="Triangulate", command=add_point, height=5, width=20).grid(row=1, column=4, rowspan=3)
+error_label = tk.Label(root, text="", width=20, height=5)
+error_label.config(wrap=100)
+error_label.grid(row=4, column=4)
 
-def draw_window(root, w):
-    global opt1_menu, opt2_menu, opt3_menu
+tk.Button(root, text="Save", command=save_map, width=40).grid(row=5, column=1, columnspan=2, pady=10)
+tk.Button(root, text="Load", command=load_map, width=40).grid(row=5, column=3, columnspan=2)
 
+for marker in mainMap.markers.values():
+    draw_point(marker)
 
-
-    w.grid(row=0, columnspan=5)
-
-    tk.Label(root, text="Reference Point 1", bg=mark1_colour, fg="white").grid(row=1, column=1)
-    opt1_menu = tk.OptionMenu(root, ref1_option, [], command=mark1)
-    opt1_menu.grid(row=1, column=2)
-    tk.Entry(root, textvariable=mark1_dist, validate="focusout", validatecommand=mark1).grid(row=1, column=3)
-
-    tk.Label(root, text="Reference Point 2", bg=mark2_colour, fg="white").grid(row=2, column=1)
-    opt2_menu = tk.OptionMenu(root, ref2_option, [], command=mark2)
-    opt2_menu.grid(row=2, column=2)
-    tk.Entry(root, textvariable=mark2_dist, validate="focusout", validatecommand=mark2).grid(row=2, column=3)
-
-    tk.Label(root, text="Reference Point 3", bg=mark3_colour, fg="white").grid(row=3, column=1)
-    opt3_menu = tk.OptionMenu(root, ref3_option, [], command=mark3)
-    opt3_menu.grid(row=3, column=2)
-    tk.Entry(root, textvariable=mark3_dist, validate="focusout", validatecommand=mark3).grid(row=3, column=3)
-
-    tk.Label(root, text="New point name:").grid(row=4, column=1)
-    tk.Entry(root, textvariable=newmark_name).grid(row=4, column=3)
-
-    tk.Button(root, text="Triangulate", command=add_point).grid(row=1, column=4, rowspan=4)
-
-    tk.Button(root, text="Save", command=save_map, width=50).grid(row=5, column=1, columnspan=2)
-    tk.Button(root, text="Load", command=load_map, width=50).grid(row=5, column=3, columnspan=2)
-
-    for marker in mainMap.markers.values():
-        draw_point(marker)
-
-
-    tk.mainloop()
-
-
-draw_window(root, w)
+tk.mainloop()
